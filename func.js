@@ -2,62 +2,69 @@ $(document).ready(function () {
 
     // status register
     var stat = {
-        ".pon": 0,
-        ".ka": 0,
-        "key": "-",
-        "player": 0
+        '.pon': 0,
+        '.ka': 0,
+        'key': '-',
+        'player': 0
     };
 
     // set animation delay by screen type (i think it's buggy)
-    var delay = (null === document.ontouchstart)? [10, 80, 80, 200]:[20,250,100,250];
+    var isTouchable = (null === document.ontouchstart)? true:false;
+    var delay = (isTouchable)? [20, 250, 100, 250]:[10, 80, 80, 200];
 
     // layout
-    var animationWidth = $("#animation").width();
+    var animationWidth = $('#animation').width();
     var dimension = [animationWidth / 4, animationWidth * 3 / 16];
 
     // audio fx controller
     var controller = {
         play: function (id) {
+            var el = this;
             this.sounds[id].play();
-            stat["key"] = id[1];
+            stat['key'] = id[1];
             setTimeout(function () {
-                stat["key"] = "-";
-            }, 100);
+                stat['key'] = '-';
+            }, 15000 / $('#tempo').val() + 1);
             if (0 !== stat[id]) {
-                clearTimeout(stat[id]);
-                $(id).attr("src", "./imgs/init.jpg").removeClass("glowing");
+                el.reset(id);
                 setTimeout(function () {
-                    $(id).attr("src", "./imgs/down.jpg").addClass("glowing");
+                    $(id).removeClass('init').addClass('down').addClass('glowing');
                 }, delay[0]);
                 stat[id] = setTimeout(function () {
-                    controller.reset(id);
+                    el.reset(id);
                 }, delay[1]);
             } else {
-                $(id).attr("src", "./imgs/animate.gif").addClass("glowing");
-                setTimeout(function () {
-                    $(id).attr("src", "./imgs/down.jpg").addClass("glowing");
-                }, delay[2]);
+                if (!isTouchable) {
+                    $(id).removeClass('init').addClass('animate').addClass('glowing');
+                    setTimeout(function () {
+                        $(id).removeClass('animate').addClass('down').addClass('glowing');
+                    }, delay[2]);
+                } else {
+                    $(id).removeClass('init').addClass('down').addClass('glowing');
+                }
                 stat[id] = setTimeout(function () {
-                    controller.reset(id);
+                    el.reset(id);
                 }, delay[3]);
             }
         },
 
         reset: function (id) {
-            $(id).attr("src", "./imgs/init.jpg").removeClass("glowing");
             clearTimeout(stat[id]);
+            $(id).removeClass('animate').removeClass('down').removeClass('glowing').addClass('init');
             stat[id] = 0;
         },
 
         // sounds
         sounds: {
-            ".pon": new Howl({
+            '.pon': new Howl({
                 buffer: true,
-                urls: ["./convert/pon.ogg", "./convert/pon.mp3"],
+                volume: 0.7,
+                urls: audio_pon,
             }),
-            ".ka": new Howl({
+            '.ka': new Howl({
                 buffer: true,
-                urls: ["./convert/ka.ogg", "./convert/ka.mp3"],
+                volume: 0.7,
+                urls: audio_ka,
             })
         }
 
@@ -66,20 +73,20 @@ $(document).ready(function () {
     // expermintal player
     var player = {
         logRecordText: function (key) {
-            $("#recordText").val($("#recordText").val() + key);
+            $('#record_text').val($('#record_text').val() + key);
         },
 
-        playRecordText: function (pos) {
-            player.stopRecordText();
-            metronome.tempo = parseInt($("#tempo").val());
-            metronome.play($("#recordText").val());
+        playRecordText: function () {
+            this.stopRecordText();
+            metronome.tempo = parseInt($('#tempo').val());
+            metronome.play($('#record_text').val());
         },
 
         stopRecordText: function (pos) {
-            clearInterval(stat["player"]);
+            clearInterval(stat['player']);
             metronome.stop();
-            $("#recordText").val(
-                $("#recordText").val().replace(/[^-kp]/g, '').replace(/^-+/, '').replace(/-+$/, '')
+            $('#record_text').val(
+                $('#record_text').val().replace(/[^-kp]/g, '').replace(/^-+/, '').replace(/-+$/, '')
             );
         }
     };
@@ -87,31 +94,41 @@ $(document).ready(function () {
     // youtube player
     var yt_player = {
         playBGM: function (vidId) {
-            var player = new YT.Player('yt_video', {
-                height: dimension[0] + 20,
-                width: dimension[1] + 80,
+            this.player = new YT.Player('yt_video', {
+                height: dimension[0] * 2,
+                width: dimension[1] * 1.6,
                 videoId: vidId,
                 events: {
                     onReady: function(e) {
-                        console.log("BGM playing");
+                        console.log('BGM playing');
                         e.target.playVideo();
+                        if (undefined !== yt_player.callback) {
+                            yt_player.callback();
+                        }
                     },
                     onStateChange: function(e) {
                         if(e.data == YT.PlayerState.ENDED) {
-                            console.log("BGM stopped");
+                            console.log('BGM stopped');
                         }
                     }
                 }
             });
-            $("#yt_video").width(dimension[0] + 80).height(dimension[1] + 20).show();
-            $(".ka").width(dimension[0]).height(dimension[1]);
+            if ('none' !== $('.upper img.ka:first').css('display')) {
+                $('#yt_video').width(dimension[0] * 2).height(dimension[1] * 1.6).show();
+                $('.ka').addClass('small');
+                $('.pon').addClass('small');
+            } else {
+                $('#yt_video').height(dimension[1] * 2.5).show();
+            }
         },
 
         setBGM: function (vidId) {
-            $("#yt_video").hide();
+            $('#yt_video').hide().replaceWith('<div id=\'yt_video\'></div>');
+            this.playBGM(vidId);
+        },
 
-            $("#yt_video").replaceWith("<div id=\"yt_video\"></div>");
-            yt_player.playBGM(vidId);
+        stopBGM: function () {
+            this.player.stopVideo();
         }
     }
 
@@ -121,98 +138,121 @@ $(document).ready(function () {
         // x .
         case 88:
         case 190:
-            controller.play(".pon");
+            controller.play('.pon');
             break;
         // a and '
         case 65:
         case 222:
-            controller.play(".ka");
+            controller.play('.ka');
             break;
         // q
         case 81:
-            var url = prompt("youtube url?");
-            var vidId = url.match(/v=([^&]*)&?/)[1];
-            yt_player.playBGM(vidId);
+            var url = prompt('youtube url?');
+            var vidId = url.match(/v=([^&]*)&?/);
+            if (vidId) {
+                yt_player.setBGM(vidId[1]);
+            }
             break;
         // w
         case 87:
-            var test = "p--p--p-p--p--p-p--p--p-k---k---p--p--p-p--p--p-k---k---p---k---k-k-ppp-k-k-pp \
-                        p-k-k-ppp-p-ppp-p-k-k-ppp-k-k-ppp-p-k-k-k-kkk-k-k-k-k-ppp-k-k-ppp-k-k-ppp-p-pp \
-                        p-p-p-kkk-ppp-k-kkkkk-kkk-k-k---p-p-k-k-ppp-k-k-ppp-k-k-ppp-p-ppp-p-k-k-ppp-k- \
-                        k-ppp-p-k-k-k-kkk-k-k-k-k-ppp-k-k-ppp-k-k-ppp-p-ppp-p-ppp-kkk-p-p-k-k-p--p--p- \
-                        pppp---p---k--kpkp-k-k-p---k---p-p-k---p---k--kpkp-k-k-p---k---ppp-k---p---k-- \
-                        kpkp-k-k-p---k---p-p-k---p---k--kpkp-k---p---p---k---k---k---k---p---p---p--pp \
-                        k-p-p-------p---p---k---k---k-kkp-p-p-ppk---k---k---p---p---p-ppk-p-p---p-p-p- \
-                        p---p-p---p---p---p-p-----------k-ppk-p-k-ppk-p-kkk-p-p-k---p-p-p-kkp-k-p-kkp- \
-                        k-p-ppk-p-k---p-p-k-ppk-p-k-ppk-p-kkk-p-p-k---p-p-k---k---k---k---p-p-p-p-p--- \
-                        p-p-k-ppk-p-k-ppk-p-kkk-p-p-k---p-p-p-kkp-k-p-kkp-k-p-ppk-p-k----p-p-k-ppk-p-k \
-                        -ppk-p-kkk-p-p-k---p-p-k---k---k---k---p-p-k-k-ppppppppp-ppppppppp-----p-p---- \
-                        -----p-----p-p-----p-p---p-k-p-p-k-p-ppkkp-kkp-pp-pp-p-pp-pp-k-kk-kk-k-kk-kk-p \
-                        -pp-pp-k-kk-kk-p-pp-pp-k-kk-kk-k-ppk-p-k-p-kkp-k-ppk-p-k-p-kkp-k-ppk-kkk-p-k-p \
-                        -ppp---------------ppp-kkk-ppp-kkk-ppp-p-k-ppppppp-ppp-ppk-ppp-ppk-ppp-k-k-ppp \
-                        pppp-p-k-ppk-p-k-ppk-p-k-ppk-ppppppp-p-k-ppk-kkp-ppk-k--k--k-ppppppp-k---k---p \
-                        ---p---p-ppk-p-p-------p---p---k---k---k-kkp-p-p-ppk---k---k---p---p---p-ppk-p \
-                        -p---p-p-p-p---p-p---p---p---p-p---------k-------------------------------k---- \
-                        ---------------------------k---------------k---k---k---k---p-k-p-k-p---p-p-k-p \
-                        pk-p-k-ppk-p-kkk-p-p-k---p-p-p-kkp-k-p-kkp-k-p-ppk-p-k---p-p-k-ppk-p-k-ppk-p-k \
-                        kk-p-p-k---p-p-k-ppk-ppk-ppk---p-p-k-k-ppppppp-k-k-ppp-k-k-ppp-k-k-ppp-p-ppp-p \
-                        -k-k-ppp-k-k-ppp-p-k-k-k-kkk-k-k-k-k-ppp-k-k-ppp-k-k-ppp-p-ppp-p-p-kkk-ppp-k-k \
-                        kkkk-kkk-k-k---p-p-k-k-ppp-k-k-ppp-k-k-ppp-p-ppp-p-k-k-ppp-k-k-ppp-p-k-k-k-kkk \
-                        -k-k-k-k-ppp-k-k-ppp-k-k-ppp-p-ppp-kkk-p-p-k-k-p--p--p-p---p---k--k--p-p";
-            $("#recordText").val(test.replace(/[^-kp]/g, ''));
+            var test = 'p--p--p-p--p--p-p--p--p-k---k---p--p--p-p--p--p-k---k---p---k---k-k-ppp-k-k-p \
+                        pp-k-k-ppp-p-ppp-p-k-k-ppp-k-k-ppp-p-k-k-k-kkk-k-k-k-k-ppp-k-k-ppp-k-k-ppp-p- \
+                        ppp-p-p-kkk-ppp-k-kkkkk-kkk-k-k---p-p-k-k-ppp-k-k-ppp-k-k-ppp-p-ppp-p-k-k-ppp \
+                        -k-k-ppp-p-k-k-k-kkk-k-k-k-k-ppp-k-k-ppp-k-k-ppp-p-ppp-p-ppp-kkk-p-p-k-k-p--p \
+                        --p-pppp----p---k--kpkp-k-k-p---k---p-p-k---p---k--kpkp-k-k-p---k---ppp-k---p \
+                        ---k--kpkp-k-k-p---k---p-p-k---p---k--kpkp-k---p---p---k---k---k---k---p---p- \
+                        --p--ppk-p-p-------p---p---k---k---k-kkp-p-p-ppk---k---k---p---p---p-ppk-p-p \
+                        ---p-p-p-p---p-p---p---p---p-p--------k-ppk-p-k-ppk-p-kkk-p-p-k---p-p-p-kkp- \
+                        k-p-kkp-k-p-ppk-p-k---p-p-k-ppk-p-k-ppk-p-kkk-p-p-k---p-p-k---k---k---k---p-p \
+                        -p-p-p---p-p-k-ppk-p-k-ppk-p-kkk-p-p-k---p-p-p-kkp-k-p-kkp-k-p-ppk-p-k----p-p \
+                        -k-ppk-p-k-ppk-p-kkk-p-p-k---p-p-k---k---k---k---p-p-k-k-ppppppp-p------p---- \
+                        -p-p-------p-----p-p-----p-p---p-k-p-p-k-p-ppkkp-kkp-pp-pp-p-pp-pp-k-kk-kk-k- \
+                        kk-kk-p-pp-pp-k-kk-kk-p-pp-pp-k-kk-kk-k-ppk-p-k-p-kkp-k-ppk-p-k-p-kkp-k-ppk-k \
+                        kk-p-k-p-ppp-------------ppp-kkk-ppp-kkk-ppp-p-k-ppppppp-ppp-ppk-ppp-ppk-ppp- \
+                        k-k-ppppppp-p-k-ppk-p-k-ppk-p-k-ppk-ppppppp-p-k-ppk-kkp-ppk-k--k--k-ppppppp-k \
+                        ---k---p---p---p-ppk-p-p-------p---p---k---k---k-kkp-p-p-ppk---k---k---p---p- \
+                        --p-ppk-p-p---p-p-p-p---p-p---p---p---p-p---------k-------------------------- \
+                        -----k-------------------------------k---------------k---------------k---k--- \
+                        k---k---p-k-p-k-p---p-p-k-ppk-p-k-ppk-p-kkk-p-p-k---p-p-p-kkp-k-p-kkp-k-p-ppk \
+                        -p-k---p-p-k-ppk-p-k-ppk-p-kkk-p-p-k---p-p-k-ppk-ppk-ppk---p-p-k-k-ppppppp-k- \
+                        k-ppp-k-k-ppp-k-k-ppp-p-ppp-p-k-k-ppp-k-k-ppp-p-k-k-k-kkk-k-k-k-k-ppp-k-k-ppp \
+                        -k-k-ppp-p-ppp-p-p-kkk-ppp-k-kkkkk-kkk-k-k---p-p-k-k-ppp-k-k-ppp-k-k-ppp-p-pp \
+                        p-p-k-k-ppp-k-k-ppp-p-k-k-k-kkk-k-k-k-k-ppp-k-k-ppp-k-k-ppp-p-ppp-p-ppp-kkk-p \
+                        -p-k-k-p--p--p-p---p---k--k--p-p';
+            $('#record_text').val(test.replace(/[^-kp]/g, ''));
             break;
         }
     });
 
-    var clickType = ((null !== document.ontouchstart)? "click":"touchstart");
-    $(".pon").bind(clickType, function () {controller.play(".pon");});
-    $(".ka").bind(clickType, function () {controller.play(".ka");});
+    var clickType = ((isTouchable)? 'touchstart':'click');
+    $('.pon').bind(clickType, function () {controller.play('.pon');});
+    $('.ka').bind(clickType, function () {controller.play('.ka');});
 
-    $("#btn_record").bind("click", function () {
+    $('#btn_record').bind('click', function () {
         player.stopRecordText();
-        $("#recordText").val("");
-        stat["player"] = setInterval(function () {
-            player.logRecordText(stat["key"]);
-        }, 100);
+        $('#record_text').val('');
+        stat['player'] = setInterval(function () {
+            player.logRecordText(stat['key']);
+        }, 15000 / $('#tempo').val());
     });
 
-    $("#btn_play").bind("click", function () {
-        player.playRecordText(0);
+    $('#btn_play').bind('click', function () {
+        player.playRecordText();
     });
 
-    $("#btn_stop").bind("click", function () {
+    $('#btn_stop').bind('click', function () {
         player.stopRecordText();
+        yt_player.stopBGM();
     });
 
     // set sample
     var patterns = [
-        "p--p--k--ppp-p--k----p--p--k--ppp-p--k-kk",
-        "p----k---p-p--p--k-----p----k---p-p--p--k",
-        "p--p--k-----p--p--k-----p--p--k-----p--p--k"
+        'p--p--k--ppp-p-k----p--p--k--ppp-p-k-kk',
+        'p---k----pp-p--k----p---k----pp-p--k',
+        'p---p---k-------p---p---k',
+        'p--p--p-p--p--p-p--p--p-k---k'
     ];
 
     var pattern = patterns[Math.floor(Math.random() * patterns.length)];
-    $("#recordText").val(pattern);
+    $('#record_text').val(pattern);
 
     setTimeout(function () {
         $('#fb_like iframe:first').attr('src', $('#fb_like iframe:first').data('src'));
     }, 1000);
 
-    $("#yt_video").hide();
+    $('#yt_video').hide();
 
     // if hash is given, extract ytid
     var str = window.location.hash.substr(1);
     var vidId = str.match(/v=([^&]*)&?/);
     if (vidId) {
         setTimeout(function() {
-            yt_player.playBGM(vidId[1]);
+            yt_player.setBGM(vidId[1]);
         }, 1000);
+        if ('2L0nTAcDtGo' === vidId[1]) {
+            $(document).trigger(jQuery.Event('keydown', { which: 87 }));
+        }
+    }
+
+    var syncDelay = str.match(/d=([^&]*)&?/);
+    if (syncDelay) {
+        yt_player.callback = function () {
+            setTimeout(function() {
+                $('#btn_play').click();
+            }, syncDelay[1]);
+        }
     }
 
     var bpm = str.match(/b=([^&]*)&?/);
     if (bpm) {
-        $("#tempo").val(parseInt(bpm[1]));
+        $('#tempo').val(parseInt(bpm[1]));
     }
     metronome.init(controller);
-    console.log("metronome initialized.");
+    console.log('metronome initialized.');
+
+    // tempo stat
+    metronome.statCallback = function (curr, len) {
+        $('#tempo_stat').text(parseInt(curr / 4) + 1);
+    }
+
 });
